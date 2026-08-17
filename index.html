@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>COSMOS-2: Deep Space Exploration Cockpit</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- WebGL Main 3D Canvas -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- 2D Canvas Overlay for HUD Target Brackets & Pitch Horizon Ladder -->
+  <canvas id="hud-canvas"></canvas>
+
+  <!-- Cockpit Frame Overlay & Scanlines -->
+  <div id="cockpit-frame">
+    <div class="scanline"></div>
+    <div class="vignette"></div>
+  </div>
+
+  <!-- Keybindings & Flight Controls Badge -->
+  <div id="keys-badge">
+    <span>FLIGHT SYSTEMS: </span>
+    <span class="key-tag">W/S</span> Thrust &nbsp;|&nbsp; 
+    <span class="key-tag">A/D</span> Yaw &nbsp;|&nbsp; 
+    <span class="key-tag">Arrows</span> Pitch &nbsp;|&nbsp; 
+    <span class="key-tag">Q/E</span> Roll &nbsp;|&nbsp; 
+    <span class="key-tag">Shift</span> Boost &nbsp;|&nbsp; 
+    <span class="key-tag">Space</span> Dampeners &nbsp;|&nbsp; 
+    <span class="key-tag">V</span> Cam Mode &nbsp;|&nbsp; 
+    <span class="key-tag">T</span> Lock Target
+  </div>
+
+  <!-- Central Flight Reticle HUD -->
+  <div id="flight-hud">
+    <div class="reticle-ring outer-ring"></div>
+    <div class="reticle-ring inner-ring"></div>
+    <div class="reticle-center"></div>
+    <div class="hud-readout">
+      <span class="hud-label">VELOCITY</span>
+      <span id="hud-velocity" class="hud-value">0.00 AU/s</span>
+    </div>
+    <div class="hud-readout thrust-readout">
+      <span class="hud-label">THRUST</span>
+      <div class="thrust-bar-bg"><div id="thrust-bar-fill" class="thrust-bar-fill"></div></div>
+      <span id="hud-thrust-pct" class="hud-value-sm">0%</span>
+    </div>
+  </div>
+
+  <!-- Holographic 3D Tactical Radar HUD -->
+  <div id="radar-container">
+    <div class="panel-header-mini">TACTICAL RADAR</div>
+    <canvas id="radar-canvas" width="160" height="160"></canvas>
+    <div class="radar-cross-h"></div>
+    <div class="radar-cross-v"></div>
+    <div class="radar-sweep"></div>
+  </div>
+
+  <!-- Left Panel 1: Ship Power & Shields Systems Console -->
+  <div class="hud-panel" id="systems-panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <span class="icon-dot"></span>
+        <span>Ship Systems</span>
+      </div>
+      <span class="status-online">NOMINAL</span>
+    </div>
+    <div class="panel-body">
+      <!-- Shield & Hull Condition Bars -->
+      <div class="stat-row">
+        <span class="stat-label">DEFENSIVE SHIELDS</span>
+        <span id="stat-shields-val" class="stat-val">100%</span>
+      </div>
+      <div class="bar-container"><div id="bar-shields" class="bar-fill shield-bar" style="width: 100%;"></div></div>
+
+      <div class="stat-row">
+        <span class="stat-label">HULL INTEGRITY</span>
+        <span id="stat-hull-val" class="stat-val">100%</span>
+      </div>
+      <div class="bar-container"><div id="bar-hull" class="bar-fill hull-bar" style="width: 100%;"></div></div>
+
+      <div class="section-divider">
+        <span>POWER DISTRIBUTION</span>
+      </div>
+
+      <!-- Interactive Power Allocators -->
+      <div class="power-row">
+        <span class="power-name">ENGINES</span>
+        <input type="range" min="0" max="100" value="35" class="power-slider" id="slider-engines">
+        <span class="power-val" id="val-engines">35%</span>
+      </div>
+      <div class="power-row">
+        <span class="power-name">SHIELDS</span>
+        <input type="range" min="0" max="100" value="25" class="power-slider" id="slider-shields">
+        <span class="power-val" id="val-shields">25%</span>
+      </div>
+      <div class="power-row">
+        <span class="power-name">SENSORS</span>
+        <input type="range" min="0" max="100" value="25" class="power-slider" id="slider-sensors">
+        <span class="power-val" id="val-sensors">25%</span>
+      </div>
+      <div class="power-row">
+        <span class="power-name">WARP</span>
+        <input type="range" min="0" max="100" value="15" class="power-slider" id="slider-warp">
+        <span class="power-val" id="val-warp">15%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Left Panel 2: Stellar Database & Navigation System -->
+  <div class="hud-panel" id="nav-panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <span class="icon-dot"></span>
+        <span>Stellar Database</span>
+      </div>
+      <span class="status-online">SYS ONLINE</span>
+    </div>
+    <div class="panel-body">
+      <div class="search-wrapper">
+        <input type="text" id="search-entities" class="search-box" placeholder="Search star, planet, moon, pulsar..." autocomplete="off" />
+        <span class="search-icon">🔍</span>
+      </div>
+      <div id="entity-list" class="custom-scroll"></div>
+    </div>
+  </div>
+
+  <!-- Right Panel: Target Telemetry & Atmospheric Analysis -->
+  <div class="hud-panel" id="telemetry-panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <span class="icon-dot"></span>
+        <span>Target Telemetry</span>
+      </div>
+      <span id="target-class" class="tag-badge tag-star">STAR</span>
+    </div>
+    <div class="panel-body">
+      <div class="telemetry-header">
+        <h2 id="target-name">Sun (Sol)</h2>
+        <div id="target-lock-status" class="lock-indicator locked">LOCKED</div>
+      </div>
+
+      <div class="telemetry-grid">
+        <div class="telemetry-row">
+          <span class="telemetry-label">Distance</span>
+          <span class="telemetry-val highlight" id="tel-distance">0.0 AU</span>
+        </div>
+        <div class="telemetry-row">
+          <span class="telemetry-label">Equatorial Radius</span>
+          <span class="telemetry-val" id="tel-radius">696,340 km</span>
+        </div>
+        <div class="telemetry-row">
+          <span class="telemetry-label">Surface Gravity</span>
+          <span class="telemetry-val" id="tel-gravity">274.0 m/s²</span>
+        </div>
+        <div class="telemetry-row">
+          <span class="telemetry-label">Surface Temp</span>
+          <span class="telemetry-val" id="tel-temp">5,778 K</span>
+        </div>
+      </div>
+
+      <div class="section-divider">
+        <span>ATMOSPHERIC / ACCRETION DATA</span>
+      </div>
+      
+      <div class="atm-block">
+        <div id="atm-label-1" class="atm-label"><span>Hydrogen</span><span id="atm-val-1">73%</span></div>
+        <div class="bar-container"><div class="bar-fill" id="atm-bar-1" style="width: 73%;"></div></div>
+
+        <div id="atm-label-2" class="atm-label"><span>Helium</span><span id="atm-val-2">25%</span></div>
+        <div class="bar-container"><div class="bar-fill alt" id="atm-bar-2" style="width: 25%;"></div></div>
+      </div>
+
+      <p id="target-desc" class="target-description"></p>
+
+      <div class="btn-group">
+        <button class="action-btn secondary" id="btn-recon">Surface Recon</button>
+        <button class="action-btn secondary" id="btn-align">Align Vector</button>
+        <button class="action-btn primary" id="btn-warp">
+          <span class="warp-sparkle">⚡</span> Engage Warp
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Cockpit Control Console & Virtual Joysticks -->
+  <div id="bottom-cockpit-bar">
+    <!-- Left Touch Joystick: Pitch & Yaw Steering -->
+    <div class="joystick-zone" id="joy-left">
+      <div class="joystick-ring"></div>
+      <div class="joystick-stick" id="stick-left"></div>
+      <div class="joystick-label">Pitch / Yaw</div>
+    </div>
+
+    <!-- Center Control Dashboard -->
+    <div class="center-dashboard">
+      <div class="dash-status-group">
+        <div class="status-indicator-box">
+          <span class="status-dot active" id="dot-dampener"></span>
+          <span class="status-title">INERTIA LOCK</span>
+        </div>
+        <div class="status-indicator-box">
+          <span class="status-dot active" id="dot-orbits"></span>
+          <span class="status-title">ORBITS</span>
+        </div>
+        <div class="status-indicator-box">
+          <span class="status-dot active" id="dot-audio"></span>
+          <span class="status-title">AUDIO</span>
+        </div>
+      </div>
+      <div class="dash-button-row">
+        <button class="dash-btn active" id="btn-dampeners">Inertia Lock</button>
+        <button class="dash-btn active" id="btn-orbit-lines">Orbits: ON</button>
+        <button class="dash-btn active" id="btn-sound">Audio: ON</button>
+        <button class="dash-btn" id="btn-view-mode">Cam: 1st Person</button>
+      </div>
+    </div>
+
+    <!-- Right Touch Joystick: Throttle & Roll -->
+    <div class="joystick-zone" id="joy-right">
+      <div class="joystick-ring"></div>
+      <div class="joystick-stick" id="stick-right"></div>
+      <div class="joystick-label">Throttle / Roll</div>
+    </div>
+  </div>
+
+  <!-- Core App Entry Point ES6 Module -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
